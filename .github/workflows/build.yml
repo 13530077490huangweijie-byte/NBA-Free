@@ -1,0 +1,800 @@
+name: Build NBA APK (one-file source)
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, master]
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - name: Install Android SDK
+        uses: android-actions/setup-android@v3
+      - name: Install SDK components
+        run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+      - name: Set up Gradle 8.9
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.9"
+      - name: Generate source code
+        shell: bash
+        run: |
+          set -e
+          mkdir -p "$(dirname settings.gradle)"
+          cat > settings.gradle <<'__NBAAPP_SOURCE_0_END__'
+          pluginManagement {
+              repositories {
+                  google()
+                  mavenCentral()
+                  gradlePluginPortal()
+              }
+          }
+          dependencyResolutionManagement {
+              repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+              repositories {
+                  google()
+                  mavenCentral()
+              }
+          }
+          rootProject.name = 'NBAFreeViewer'
+          include ':app'
+          __NBAAPP_SOURCE_0_END__
+          mkdir -p "$(dirname build.gradle)"
+          cat > build.gradle <<'__NBAAPP_SOURCE_1_END__'
+          plugins {
+              id 'com.android.application' version '8.7.3' apply false
+          }
+          __NBAAPP_SOURCE_1_END__
+          mkdir -p "$(dirname gradle.properties)"
+          cat > gradle.properties <<'__NBAAPP_SOURCE_2_END__'
+          org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
+          android.useAndroidX=true
+          __NBAAPP_SOURCE_2_END__
+          mkdir -p "$(dirname app/build.gradle)"
+          cat > app/build.gradle <<'__NBAAPP_SOURCE_3_END__'
+          plugins {
+              id 'com.android.application'
+          }
+          
+          android {
+              namespace 'com.example.nbafreeviewer'
+              compileSdk 35
+          
+              defaultConfig {
+                  applicationId 'com.example.nbafreeviewer'
+                  minSdk 24
+                  targetSdk 35
+                  versionCode 1
+                  versionName '1.0.0'
+              }
+          
+              compileOptions {
+                  sourceCompatibility JavaVersion.VERSION_17
+                  targetCompatibility JavaVersion.VERSION_17
+              }
+          }
+          __NBAAPP_SOURCE_3_END__
+          mkdir -p "$(dirname app/src/main/AndroidManifest.xml)"
+          cat > app/src/main/AndroidManifest.xml <<'__NBAAPP_SOURCE_4_END__'
+          <?xml version="1.0" encoding="utf-8"?>
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+              <uses-permission android:name="android.permission.INTERNET" />
+              <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+          
+              <application
+                  android:allowBackup="false"
+                  android:usesCleartextTraffic="false"
+                  android:label="NBA观赛助手"
+                  android:icon="@drawable/ic_basketball"
+                  android:theme="@style/AppTheme">
+                  <activity
+                      android:name=".MainActivity"
+                      android:exported="true"
+                      android:configChanges="orientation|screenSize|keyboardHidden">
+                      <intent-filter>
+                          <action android:name="android.intent.action.MAIN" />
+                          <category android:name="android.intent.category.LAUNCHER" />
+                      </intent-filter>
+                  </activity>
+              </application>
+          </manifest>
+          __NBAAPP_SOURCE_4_END__
+          mkdir -p "$(dirname app/src/main/res/values/styles.xml)"
+          cat > app/src/main/res/values/styles.xml <<'__NBAAPP_SOURCE_5_END__'
+          <?xml version="1.0" encoding="utf-8"?>
+          <resources>
+              <style name="AppTheme" parent="android:style/Theme.Material.NoActionBar">
+                  <item name="android:fontFamily">sans</item>
+                  <item name="android:colorAccent">#F97316</item>
+                  <item name="android:statusBarColor">#0B1220</item>
+                  <item name="android:navigationBarColor">#0B1220</item>
+                  <item name="android:windowLightStatusBar">false</item>
+                  <item name="android:windowActionModeOverlay">true</item>
+              </style>
+          </resources>
+          __NBAAPP_SOURCE_5_END__
+          mkdir -p "$(dirname app/src/main/res/drawable/ic_basketball.xml)"
+          cat > app/src/main/res/drawable/ic_basketball.xml <<'__NBAAPP_SOURCE_6_END__'
+          <?xml version="1.0" encoding="utf-8"?>
+          <vector xmlns:android="http://schemas.android.com/apk/res/android"
+              android:width="96dp" android:height="96dp" android:viewportWidth="96" android:viewportHeight="96">
+              <path android:fillColor="#FF7A25" android:pathData="M48,4A44,44 0,1 1,48 92A44,44 0,1 1,48 4Z"/>
+              <path android:strokeColor="#1C2435" android:strokeWidth="5" android:fillColor="#00000000" android:pathData="M48,4L48,92M4,48L92,48M17,17C52,42 52,54 17,79M79,17C44,42 44,54 79,79"/>
+          </vector>
+          __NBAAPP_SOURCE_6_END__
+          mkdir -p "$(dirname app/src/main/java/com/example/nbafreeviewer/MainActivity.java)"
+          cat > app/src/main/java/com/example/nbafreeviewer/MainActivity.java <<'__NBAAPP_SOURCE_7_END__'
+          package com.example.nbafreeviewer;
+          
+          import android.app.Activity;
+          import android.content.ActivityNotFoundException;
+          import android.content.Intent;
+          import android.content.pm.ActivityInfo;
+          import android.graphics.Color;
+          import android.graphics.Typeface;
+          import android.graphics.drawable.GradientDrawable;
+          import android.net.Uri;
+          import android.os.Bundle;
+          import android.os.Handler;
+          import android.os.Looper;
+          import android.view.Gravity;
+          import android.view.View;
+          import android.view.ViewGroup;
+          import android.webkit.WebChromeClient;
+          import android.webkit.WebResourceRequest;
+          import android.webkit.WebSettings;
+          import android.webkit.WebView;
+          import android.webkit.WebViewClient;
+          import android.widget.FrameLayout;
+          import android.widget.LinearLayout;
+          import android.widget.ScrollView;
+          import android.widget.TextView;
+          import android.widget.Toast;
+          
+          import org.json.JSONArray;
+          import org.json.JSONObject;
+          import org.xmlpull.v1.XmlPullParser;
+          
+          import java.io.BufferedInputStream;
+          import java.io.ByteArrayOutputStream;
+          import java.io.InputStream;
+          import java.io.StringReader;
+          import java.net.HttpURLConnection;
+          import java.net.URL;
+          import java.nio.charset.StandardCharsets;
+          import java.text.SimpleDateFormat;
+          import java.util.ArrayList;
+          import java.util.Calendar;
+          import java.util.Date;
+          import java.util.HashMap;
+          import java.util.Locale;
+          import java.util.Map;
+          import java.util.TimeZone;
+          import java.util.concurrent.ExecutorService;
+          import java.util.concurrent.Executors;
+          
+          public class MainActivity extends Activity {
+              private static final int BG = 0xFF0B1220;
+              private static final int CARD = 0xFF182338;
+              private static final int TEXT = 0xFFF5F7FE;
+              private static final int MUTED = 0xFFAEBED7;
+              private static final int ORANGE = 0xFFF97316;
+              private static final int BLUE = 0xFF2563EB;
+              private static final String NBA_VIDEOS = "https://www.nba.com/watch/featured";
+              private static final String NBA_HIGHLIGHTS = "https://www.nba.com/watch/list/collection/full-game-highlights";
+              private static final String YOUTUBE = "https://www.youtube.com/@NBA/videos";
+              private static final String YOUTUBE_LIVE = "https://www.youtube.com/@NBA/live";
+              private static final String RSS = "https://www.youtube.com/feeds/videos.xml?channel_id=UCWJ2lWNubArHWmf3FIHbfcQ";
+          
+              private final Handler handler = new Handler(Looper.getMainLooper());
+              private final ExecutorService executor = Executors.newFixedThreadPool(2);
+              private final Calendar eastDate = Calendar.getInstance(TimeZone.getTimeZone("America/New_York"));
+              private final Map<String, String> teams = createTeamMap();
+              private FrameLayout root;
+              private LinearLayout content;
+              private LinearLayout nav;
+              private LinearLayout gamesHolder;
+              private LinearLayout feedHolder;
+              private TextView dateLabel;
+              private TextView scoreMessage;
+              private int currentTab = -1;
+              private int requestSerial = 0;
+              private int feedSerial = 0;
+              private FrameLayout webOverlay;
+              private WebView browser;
+              private View fullscreenView;
+              private WebChromeClient.CustomViewCallback fullscreenCallback;
+          
+              private final Runnable ticker = new Runnable() {
+                  @Override public void run() {
+                      if (currentTab == 0 && gamesHolder != null) loadGames(false);
+                      handler.postDelayed(this, 60_000);
+                  }
+              };
+          
+              @Override public void onCreate(Bundle state) {
+                  super.onCreate(state);
+                  getWindow().setStatusBarColor(BG);
+                  getWindow().setNavigationBarColor(BG);
+                  root = new FrameLayout(this);
+                  root.setBackgroundColor(BG);
+                  setContentView(root);
+          
+                  LinearLayout shell = new LinearLayout(this);
+                  shell.setOrientation(LinearLayout.VERTICAL);
+                  root.addView(shell, new FrameLayout.LayoutParams(-1, -1));
+          
+                  LinearLayout head = new LinearLayout(this);
+                  head.setPadding(dp(19), dp(20), dp(19), dp(16));
+                  head.setOrientation(LinearLayout.VERTICAL);
+                  head.setBackgroundColor(BG);
+                  TextView brand = text("🏀  NBA 观赛助手", 24, TEXT, true);
+                  head.addView(brand);
+                  TextView caption = text("免费集锦 · 正版直播入口 · 实时赛程", 12, MUTED, false);
+                  LinearLayout.LayoutParams cp = new LinearLayout.LayoutParams(-1, -2);
+                  cp.topMargin = dp(4);
+                  head.addView(caption, cp);
+                  shell.addView(head);
+          
+                  content = new LinearLayout(this);
+                  content.setOrientation(LinearLayout.VERTICAL);
+                  shell.addView(content, new LinearLayout.LayoutParams(-1, 0, 1));
+                  nav = new LinearLayout(this);
+                  nav.setPadding(dp(7), dp(8), dp(7), dp(12));
+                  nav.setBackgroundColor(0xFF111C2D);
+                  shell.addView(nav);
+                  changeTab(0);
+              }
+          
+              @Override public void onResume() {
+                  super.onResume();
+                  handler.removeCallbacks(ticker);
+                  handler.postDelayed(ticker, 60_000);
+              }
+          
+              @Override public void onPause() {
+                  super.onPause();
+                  handler.removeCallbacks(ticker);
+              }
+          
+              @Override public void onDestroy() {
+                  handler.removeCallbacks(ticker);
+                  requestSerial++;
+                  feedSerial++;
+                  closeBrowser();
+                  executor.shutdownNow();
+                  super.onDestroy();
+              }
+          
+              private void changeTab(int tab) {
+                  currentTab = tab;
+                  gamesHolder = null;
+                  feedHolder = null;
+                  content.removeAllViews();
+                  nav.removeAllViews();
+                  String[] labels = {"🏀  赛程比分", "▶  免费视频", "📺  直播入口"};
+                  for (int i = 0; i < labels.length; i++) {
+                      final int target = i;
+                      TextView item = text(labels[i], 12, i == tab ? Color.WHITE : MUTED, i == tab);
+                      item.setGravity(Gravity.CENTER);
+                      item.setPadding(dp(4), dp(12), dp(4), dp(12));
+                      item.setBackground(round(i == tab ? 0xFF253958 : 0xFF111C2D, 12));
+                      LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(0, -2, 1);
+                      p.setMargins(dp(2), 0, dp(2), 0);
+                      nav.addView(item, p);
+                      item.setOnClickListener(v -> { if (currentTab != target) changeTab(target); });
+                  }
+                  if (tab == 0) showGames();
+                  else if (tab == 1) showVideos();
+                  else showLive();
+              }
+          
+              private void showGames() {
+                  ScrollView scroll = scroll();
+                  content.addView(scroll, new LinearLayout.LayoutParams(-1, -1));
+                  LinearLayout body = column(scroll);
+                  body.addView(sectionTitle("NBA 比赛日程", "按美东日期查看，时间显示为手机当地时间"));
+          
+                  LinearLayout row = new LinearLayout(this);
+                  row.setGravity(Gravity.CENTER_VERTICAL);
+                  row.setPadding(0, dp(9), 0, dp(9));
+                  TextView prev = button("‹ 前一天", CARD);
+                  TextView next = button("后一天 ›", CARD);
+                  dateLabel = text("", 14, TEXT, true);
+                  dateLabel.setGravity(Gravity.CENTER);
+                  row.addView(prev, new LinearLayout.LayoutParams(0, dp(46), 1));
+                  row.addView(dateLabel, new LinearLayout.LayoutParams(0, dp(46), 1.5f));
+                  row.addView(next, new LinearLayout.LayoutParams(0, dp(46), 1));
+                  body.addView(row);
+                  prev.setOnClickListener(v -> { eastDate.add(Calendar.DATE, -1); loadGames(true); });
+                  next.setOnClickListener(v -> { eastDate.add(Calendar.DATE, 1); loadGames(true); });
+          
+                  TextView refresh = button("↻  刷新本日赛况", BLUE);
+                  body.addView(refresh, fullWithBottom(10));
+                  refresh.setOnClickListener(v -> loadGames(true));
+                  scoreMessage = text("连接比赛数据中…", 13, MUTED, false);
+                  scoreMessage.setPadding(dp(4), dp(8), 0, dp(10));
+                  body.addView(scoreMessage);
+                  gamesHolder = new LinearLayout(this);
+                  gamesHolder.setOrientation(LinearLayout.VERTICAL);
+                  body.addView(gamesHolder);
+                  loadGames(true);
+              }
+          
+              private void loadGames(boolean clear) {
+                  if (gamesHolder == null) return;
+                  String date = easternDate("yyyyMMdd", Locale.US);
+                  String label = easternDate("MM月dd日  EEE", Locale.CHINA);
+                  dateLabel.setText(label);
+                  int serial = ++requestSerial;
+                  if (clear) {
+                      scoreMessage.setText("加载中…");
+                      gamesHolder.removeAllViews();
+                  }
+                  executor.execute(() -> {
+                      try {
+                          String json = fetch("https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates=" + date);
+                          JSONArray events = new JSONObject(json).optJSONArray("events");
+                          if (events == null) throw new Exception("暂无比赛数据");
+                          runOnUiThread(() -> {
+                              if (serial != requestSerial || currentTab != 0 || gamesHolder == null) return;
+                              gamesHolder.removeAllViews();
+                              scoreMessage.setText(events.length() == 0 ? "该日期没有比赛" : "找到 " + events.length() + " 场比赛 · 自动每分钟刷新");
+                              for (int i = 0; i < events.length(); i++) {
+                                  JSONObject game = events.optJSONObject(i);
+                                  if (game != null) addGameCard(game);
+                              }
+                          });
+                      } catch (Exception e) {
+                          runOnUiThread(() -> {
+                              if (serial != requestSerial || currentTab != 0 || scoreMessage == null) return;
+                              scoreMessage.setText("赛况获取失败，点“刷新”重试。网络或数据源可能不可用。");
+                          });
+                      }
+                  });
+              }
+          
+              private void addGameCard(JSONObject game) {
+                  JSONArray competitions = game.optJSONArray("competitions");
+                  if (competitions == null || competitions.length() == 0) return;
+                  JSONObject match = competitions.optJSONObject(0);
+                  if (match == null) return;
+                  JSONArray entries = match.optJSONArray("competitors");
+                  if (entries == null || entries.length() < 2) return;
+                  JSONObject away = null, home = null;
+                  for (int j = 0; j < entries.length(); j++) {
+                      JSONObject item = entries.optJSONObject(j);
+                      if (item == null) continue;
+                      if ("home".equals(item.optString("homeAway"))) home = item;
+                      else away = item;
+                  }
+                  if (home == null || away == null) return;
+                  JSONObject status = game.optJSONObject("status");
+                  JSONObject type = status == null ? null : status.optJSONObject("type");
+                  String state = type == null ? "pre" : type.optString("state", "pre");
+                  String subtitle;
+                  if ("in".equals(state)) {
+                      subtitle = "🔴  直播比分 · 第" + (status == null ? "?" : status.optInt("period", 0)) + "节 "
+                              + (status == null ? "" : status.optString("displayClock", ""));
+                  } else if ("post".equals(state)) {
+                      subtitle = "已结束 · 最终比分";
+                  } else {
+                      subtitle = "未开赛 · " + localTime(game.optString("date"));
+                  }
+                  LinearLayout card = card();
+                  TextView s = text(subtitle, 12, "in".equals(state) ? 0xFFFCA5A5 : MUTED, false);
+                  s.setPadding(0, 0, 0, dp(10));
+                  card.addView(s);
+                  addTeam(card, away, "客队", state);
+                  addTeam(card, home, "主队", state);
+                  TextView bottom = text("查看赛事实况与可用播放入口  ›", 12, ORANGE, true);
+                  bottom.setPadding(0, dp(13), 0, 0);
+                  card.addView(bottom);
+                  card.setOnClickListener(v -> openBrowser("NBA 官方观看入口", NBA_VIDEOS));
+                  gamesHolder.addView(card, fullWithBottom(11));
+              }
+          
+              private void addTeam(LinearLayout parent, JSONObject competitor, String side, String state) {
+                  JSONObject team = competitor.optJSONObject("team");
+                  String abbr = team == null ? "?" : team.optString("abbreviation", "?");
+                  String name = teams.containsKey(abbr) ? teams.get(abbr) : (team == null ? "球队" : team.optString("displayName", abbr));
+                  String score = "pre".equals(state) ? "—" : competitor.optString("score", "0");
+                  LinearLayout row = new LinearLayout(this);
+                  row.setGravity(Gravity.CENTER_VERTICAL);
+                  row.setPadding(0, dp(6), 0, dp(6));
+                  TextView nameView = text(name + "  ·  " + side, 16, TEXT, true);
+                  row.addView(nameView, new LinearLayout.LayoutParams(0, -2, 1));
+                  TextView scoreView = text(score, 22, ORANGE, true);
+                  row.addView(scoreView);
+                  parent.addView(row);
+              }
+          
+              private void showVideos() {
+                  ScrollView scroll = scroll();
+                  content.addView(scroll, new LinearLayout.LayoutParams(-1, -1));
+                  LinearLayout body = column(scroll);
+                  body.addView(sectionTitle("正版免费视频", "官方公开视频、比赛集锦和精彩瞬间"));
+                  infoBox(body, "以下视频来自官方公开频道。免费视频不等于每场完整比赛免费直播。");
+                  linkCard(body, "🔥  NBA 官方比赛集锦", "官方全场精彩回顾，按上架情况免费观看", NBA_HIGHLIGHTS, true);
+                  linkCard(body, "🏀  NBA 官方精选视频", "球星集锦、热门赛事与访谈", NBA_VIDEOS, true);
+                  linkCard(body, "▶  NBA 官方 YouTube", "原版精彩集锦，可切换外部 YouTube 打开", YOUTUBE, true);
+                  linkCard(body, "📼  NBA 经典比赛专区", "经典公开内容，个别视频可能要求订阅", "https://www.nba.com/watch/list/collection/classic-games", true);
+                  TextView head = text("最新 NBA 官方公开视频", 18, TEXT, true);
+                  head.setPadding(0, dp(19), 0, dp(9));
+                  body.addView(head);
+                  TextView reload = button("↻  获取最新视频", BLUE);
+                  body.addView(reload, fullWithBottom(10));
+                  feedHolder = new LinearLayout(this);
+                  feedHolder.setOrientation(LinearLayout.VERTICAL);
+                  body.addView(feedHolder);
+                  reload.setOnClickListener(v -> loadFeed());
+                  loadFeed();
+              }
+          
+              private void loadFeed() {
+                  if (feedHolder == null) return;
+                  int serial = ++feedSerial;
+                  feedHolder.removeAllViews();
+                  feedHolder.addView(text("读取 NBA 官方视频目录中…", 13, MUTED, false));
+                  executor.execute(() -> {
+                      try {
+                          ArrayList<Video> videos = parseFeed(fetch(RSS));
+                          runOnUiThread(() -> {
+                              if (serial != feedSerial || currentTab != 1 || feedHolder == null) return;
+                              feedHolder.removeAllViews();
+                              if (videos.isEmpty()) {
+                                  feedHolder.addView(text("官方视频列表暂时没有返回内容，可点击上方 NBA 官方视频入口。", 13, MUTED, false));
+                                  return;
+                              }
+                              for (Video item : videos) {
+                                  linkCard(feedHolder, "▶  " + item.title, "官方频道 · " + item.published, 
+                                          "https://www.youtube.com/watch?v=" + item.id, true);
+                              }
+                          });
+                      } catch (Exception ex) {
+                          runOnUiThread(() -> {
+                              if (serial != feedSerial || currentTab != 1 || feedHolder == null) return;
+                              feedHolder.removeAllViews();
+                              TextView err = text("最新目录暂时无法加载（如 YouTube 网络受限）。可用上方 NBA 官方精选视频入口。", 13, MUTED, false);
+                              feedHolder.addView(err);
+                          });
+                      }
+                  });
+              }
+          
+              private void showLive() {
+                  ScrollView scroll = scroll();
+                  content.addView(scroll, new LinearLayout.LayoutParams(-1, -1));
+                  LinearLayout body = column(scroll);
+                  body.addView(sectionTitle("NBA 观看 / 直播", "仅收录官方及正版频道，按实际播出内容观看"));
+                  infoBox(body, "并非所有 NBA 比赛都免费直播。央视只在节目单安排 NBA 时能观看对应场次；其他比赛可能需要正版会员。入口不会破解付费、DRM 或地区限制。");
+                  linkCard(body, "🔴  CCTV-5 体育直播", "央视官方入口 · 是否转播 NBA 请看当天节目单", "https://tv.cctv.com/live/cctv5/m/", false);
+                  linkCard(body, "📺  CCTV-5+ 赛事直播", "央视官方赛事频道 · 部分内容可能有地区限制", "https://tv.cctv.com/live/cctv5plus/m/", false);
+                  linkCard(body, "🏀  NBA 官方直播与免费频道", "NBA 官方 Watch 页面：可查看开放频道 / 活动", NBA_VIDEOS, true);
+                  linkCard(body, "▶  NBA YouTube 官方 LIVE", "仅限官方实际公开的免费直播、资讯节目", YOUTUBE_LIVE, false);
+                  linkCard(body, "💳  NBA League Pass", "付费完整比赛入口（非免费）", "https://www.nba.com/league-pass", false);
+                  TextView foot = text("播放提示：部分网站禁止在第三方 APP 内播放。打开页面后可点右上角“外部打开”，改用 Chrome、央视影音或 YouTube 官方客户端。", 12, MUTED, false);
+                  foot.setPadding(dp(4), dp(14), dp(4), dp(25));
+                  body.addView(foot);
+              }
+          
+              private void infoBox(LinearLayout parent, String value) {
+                  LinearLayout box = new LinearLayout(this);
+                  box.setPadding(dp(15), dp(14), dp(15), dp(14));
+                  box.setBackground(round(0xFF202E46, 13));
+                  TextView description = text("提示 · " + value, 12, 0xFFE7D6B6, false);
+                  box.addView(description);
+                  parent.addView(box, fullWithBottom(14));
+              }
+          
+              private void linkCard(LinearLayout parent, String title, String sub, String url, boolean inApp) {
+                  LinearLayout card = card();
+                  TextView name = text(title, 17, TEXT, true);
+                  card.addView(name);
+                  TextView desc = text(sub, 12, MUTED, false);
+                  desc.setPadding(0, dp(8), 0, dp(12));
+                  card.addView(desc);
+                  TextView action = text(inApp ? "进入播放页  ›" : "打开正版播放入口  ↗", 13, ORANGE, true);
+                  card.addView(action);
+                  card.setOnClickListener(v -> {
+                      if (inApp) openBrowser(title, url);
+                      else openExternal(url);
+                  });
+                  parent.addView(card, fullWithBottom(11));
+              }
+          
+              private void openBrowser(String title, String url) {
+                  if (webOverlay != null) closeBrowser();
+                  webOverlay = new FrameLayout(this);
+                  webOverlay.setBackgroundColor(BG);
+                  root.addView(webOverlay, new FrameLayout.LayoutParams(-1, -1));
+                  LinearLayout panel = new LinearLayout(this);
+                  panel.setOrientation(LinearLayout.VERTICAL);
+                  webOverlay.addView(panel, new FrameLayout.LayoutParams(-1, -1));
+                  LinearLayout tools = new LinearLayout(this);
+                  tools.setPadding(dp(9), dp(8), dp(9), dp(8));
+                  tools.setGravity(Gravity.CENTER_VERTICAL);
+                  tools.setBackgroundColor(0xFF15233B);
+                  TextView back = text("‹ 返回", 14, TEXT, true);
+                  back.setPadding(dp(8), dp(12), dp(10), dp(12));
+                  tools.addView(back);
+                  TextView pageTitle = text(title, 12, TEXT, true);
+                  pageTitle.setSingleLine(true);
+                  pageTitle.setEllipsize(android.text.TextUtils.TruncateAt.END);
+                  tools.addView(pageTitle, new LinearLayout.LayoutParams(0, -2, 1));
+                  TextView outside = text("外部打开 ↗", 12, ORANGE, true);
+                  outside.setPadding(dp(7), dp(12), dp(5), dp(12));
+                  tools.addView(outside);
+                  panel.addView(tools);
+                  browser = new WebView(this);
+                  browser.setBackgroundColor(BG);
+                  browser.getSettings().setJavaScriptEnabled(true);
+                  browser.getSettings().setDomStorageEnabled(true);
+                  browser.getSettings().setMediaPlaybackRequiresUserGesture(true);
+                  browser.getSettings().setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
+                  browser.setWebViewClient(new WebViewClient() {
+                      @Override public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
+                          Uri uri = request.getUrl();
+                          String scheme = uri.getScheme();
+                          if ("https".equalsIgnoreCase(scheme) || "http".equalsIgnoreCase(scheme)) {
+                              return false;
+                          }
+                          try { startActivity(new Intent(Intent.ACTION_VIEW, uri)); }
+                          catch (Exception ignored) { }
+                          return true;
+                      }
+                      @Override public void onReceivedError(WebView view, WebResourceRequest req, android.webkit.WebResourceError error) {
+                          if (req.isForMainFrame()) Toast.makeText(MainActivity.this,
+                                  "页面无法打开，请尝试右上角“外部打开”", Toast.LENGTH_LONG).show();
+                      }
+                  });
+                  browser.setWebChromeClient(new WebChromeClient() {
+                      @Override public void onShowCustomView(View view, CustomViewCallback callback) {
+                          enterFullscreen(view, callback);
+                      }
+                      @Override public void onHideCustomView() { exitFullscreen(); }
+                  });
+                  panel.addView(browser, new LinearLayout.LayoutParams(-1, 0, 1));
+                  back.setOnClickListener(v -> closeBrowser());
+                  outside.setOnClickListener(v -> {
+                      String liveUrl = browser == null ? url : browser.getUrl();
+                      openExternal(liveUrl == null ? url : liveUrl);
+                  });
+                  browser.loadUrl(url);
+              }
+          
+              private void enterFullscreen(View view, WebChromeClient.CustomViewCallback callback) {
+                  if (fullscreenView != null) exitFullscreen();
+                  fullscreenView = view;
+                  fullscreenCallback = callback;
+                  FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(-1, -1);
+                  root.addView(view, lp);
+                  getWindow().getDecorView().setSystemUiVisibility(5894 | View.SYSTEM_UI_FLAG_FULLSCREEN);
+                  setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
+              }
+          
+              private void exitFullscreen() {
+                  if (fullscreenView == null) return;
+                  root.removeView(fullscreenView);
+                  fullscreenView = null;
+                  if (fullscreenCallback != null) {
+                      fullscreenCallback.onCustomViewHidden();
+                      fullscreenCallback = null;
+                  }
+                  getWindow().getDecorView().setSystemUiVisibility(0);
+                  setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED);
+              }
+          
+              private void closeBrowser() {
+                  exitFullscreen();
+                  if (browser != null) {
+                      browser.stopLoading();
+                      browser.loadUrl("about:blank");
+                      browser.destroy();
+                      browser = null;
+                  }
+                  if (webOverlay != null) {
+                      root.removeView(webOverlay);
+                      webOverlay = null;
+                  }
+              }
+          
+              private void openExternal(String url) {
+                  try {
+                      startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
+                  } catch (ActivityNotFoundException e) {
+                      Toast.makeText(this, "未找到支持该网址的浏览器", Toast.LENGTH_SHORT).show();
+                  }
+              }
+          
+              @Override public void onBackPressed() {
+                  if (fullscreenView != null) { exitFullscreen(); return; }
+                  if (webOverlay != null) {
+                      if (browser != null && browser.canGoBack()) browser.goBack();
+                      else closeBrowser();
+                      return;
+                  }
+                  if (currentTab != 0) { changeTab(0); return; }
+                  super.onBackPressed();
+              }
+          
+              private ScrollView scroll() {
+                  ScrollView scroll = new ScrollView(this);
+                  scroll.setFillViewport(false);
+                  scroll.setClipToPadding(false);
+                  scroll.setVerticalScrollBarEnabled(false);
+                  return scroll;
+              }
+          
+              private LinearLayout column(ScrollView scroll) {
+                  LinearLayout body = new LinearLayout(this);
+                  body.setOrientation(LinearLayout.VERTICAL);
+                  body.setPadding(dp(16), dp(11), dp(16), dp(30));
+                  scroll.addView(body);
+                  return body;
+              }
+          
+              private View sectionTitle(String title, String subtitle) {
+                  LinearLayout block = new LinearLayout(this);
+                  block.setOrientation(LinearLayout.VERTICAL);
+                  block.setPadding(dp(2), dp(8), dp(2), dp(11));
+                  block.addView(text(title, 22, TEXT, true));
+                  TextView sub = text(subtitle, 12, MUTED, false);
+                  sub.setPadding(0, dp(6), 0, 0);
+                  block.addView(sub);
+                  return block;
+              }
+          
+              private LinearLayout card() {
+                  LinearLayout card = new LinearLayout(this);
+                  card.setOrientation(LinearLayout.VERTICAL);
+                  card.setPadding(dp(16), dp(16), dp(16), dp(16));
+                  card.setBackground(round(CARD, 15));
+                  card.setClickable(true);
+                  return card;
+              }
+          
+              private GradientDrawable round(int color, int radiusDp) {
+                  GradientDrawable background = new GradientDrawable();
+                  background.setColor(color);
+                  background.setCornerRadius(dp(radiusDp));
+                  return background;
+              }
+          
+              private TextView button(String label, int color) {
+                  TextView view = text(label, 14, TEXT, true);
+                  view.setGravity(Gravity.CENTER);
+                  view.setPadding(dp(13), dp(13), dp(13), dp(13));
+                  view.setBackground(round(color, 11));
+                  return view;
+              }
+          
+              private TextView text(String value, int sp, int color, boolean bold) {
+                  TextView view = new TextView(this);
+                  view.setText(value);
+                  view.setTextSize(sp);
+                  view.setTextColor(color);
+                  if (bold) view.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+                  return view;
+              }
+          
+              private LinearLayout.LayoutParams fullWithBottom(int bottom) {
+                  LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2);
+                  lp.bottomMargin = dp(bottom);
+                  return lp;
+              }
+          
+              private int dp(int value) {
+                  return Math.round(value * getResources().getDisplayMetrics().density);
+              }
+          
+              private String easternDate(String pattern, Locale locale) {
+                  SimpleDateFormat date = new SimpleDateFormat(pattern, locale);
+                  date.setTimeZone(eastDate.getTimeZone());
+                  return date.format(eastDate.getTime());
+              }
+          
+              private String localTime(String value) {
+                  try {
+                      SimpleDateFormat input = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm", Locale.US);
+                      input.setTimeZone(TimeZone.getTimeZone("UTC"));
+                      Date date = input.parse(value);
+                      if (date == null) return "时间待定";
+                      return new SimpleDateFormat("MM-dd HH:mm", Locale.CHINA).format(date);
+                  } catch (Exception ignored) { return "时间待定"; }
+              }
+          
+              private static String fetch(String address) throws Exception {
+                  HttpURLConnection conn = (HttpURLConnection) new URL(address).openConnection();
+                  conn.setConnectTimeout(10_000);
+                  conn.setReadTimeout(12_000);
+                  conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Android; NBA Free Viewer)");
+                  conn.setRequestProperty("Accept", "application/json, application/xml, text/xml, */*");
+                  try {
+                      if (conn.getResponseCode() != 200) throw new Exception("HTTP " + conn.getResponseCode());
+                      try (InputStream input = new BufferedInputStream(conn.getInputStream());
+                           ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+                          byte[] chunk = new byte[8192];
+                          int size;
+                          while ((size = input.read(chunk)) != -1) {
+                              if (out.size() + size > 2_000_000) throw new Exception("服务器返回内容过大");
+                              out.write(chunk, 0, size);
+                          }
+                          return out.toString(StandardCharsets.UTF_8.name());
+                      }
+                  } finally { conn.disconnect(); }
+              }
+          
+              private static class Video {
+                  String title, id, published;
+                  Video(String t, String i, String p) { title = t; id = i; published = p; }
+              }
+          
+              private static ArrayList<Video> parseFeed(String xml) throws Exception {
+                  ArrayList<Video> result = new ArrayList<>();
+                  XmlPullParser parser = android.util.Xml.newPullParser();
+                  parser.setInput(new StringReader(xml));
+                  boolean inside = false;
+                  String tag = "", id = "", title = "", published = "";
+                  int event = parser.getEventType();
+                  while (event != XmlPullParser.END_DOCUMENT && result.size() < 12) {
+                      if (event == XmlPullParser.START_TAG) {
+                          tag = parser.getName();
+                          if ("entry".equals(tag)) {
+                              inside = true;
+                              id = ""; title = ""; published = "";
+                          }
+                      } else if (event == XmlPullParser.TEXT && inside) {
+                          String value = parser.getText();
+                          if ("title".equals(tag)) title += value;
+                          else if (tag.endsWith("videoId")) id += value;
+                          else if ("published".equals(tag)) published += value;
+                      } else if (event == XmlPullParser.END_TAG) {
+                          if ("entry".equals(parser.getName())) {
+                              if (id.matches("[A-Za-z0-9_-]{11}")) {
+                                  String day = published.length() >= 10 ? published.substring(0, 10) : "最新";
+                                  result.add(new Video(title.trim(), id.trim(), day));
+                              }
+                              inside = false;
+                          }
+                          tag = "";
+                      }
+                      event = parser.next();
+                  }
+                  return result;
+              }
+          
+              private static Map<String, String> createTeamMap() {
+                  Map<String, String> m = new HashMap<>();
+                  m.put("ATL", "老鹰"); m.put("BOS", "凯尔特人"); m.put("BKN", "篮网");
+                  m.put("CHA", "黄蜂"); m.put("CHI", "公牛"); m.put("CLE", "骑士");
+                  m.put("DAL", "独行侠"); m.put("DEN", "掘金"); m.put("DET", "活塞");
+                  m.put("GS", "勇士"); m.put("GSW", "勇士"); m.put("HOU", "火箭");
+                  m.put("IND", "步行者"); m.put("LAC", "快船"); m.put("LAL", "湖人");
+                  m.put("MEM", "灰熊"); m.put("MIA", "热火"); m.put("MIL", "雄鹿");
+                  m.put("MIN", "森林狼"); m.put("NO", "鹈鹕"); m.put("NOP", "鹈鹕");
+                  m.put("NY", "尼克斯"); m.put("NYK", "尼克斯"); m.put("OKC", "雷霆");
+                  m.put("ORL", "魔术"); m.put("PHI", "76人"); m.put("PHX", "太阳");
+                  m.put("POR", "开拓者"); m.put("SAC", "国王"); m.put("SA", "马刺");
+                  m.put("SAS", "马刺"); m.put("TOR", "猛龙"); m.put("UTA", "爵士");
+                  m.put("UTAH", "爵士"); m.put("WSH", "奇才"); m.put("WAS", "奇才");
+                  return m;
+              }
+          }
+          __NBAAPP_SOURCE_7_END__
+      - name: Compile APK
+        run: gradle --no-daemon assembleDebug
+      - name: Downloadable APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: NBAFreeViewer-APK
+          path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
